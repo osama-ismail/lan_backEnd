@@ -25,7 +25,7 @@ def generate_jwt(email):
     token = jwt.encode(payload, JWT_SECRET_KEY, algorithm="HS256")
     return token
 
-@auth_bp.route('/authas', methods=['POST'])
+@auth_bp.route('/auth', methods=['POST'])
 def login():
     """
     Login API - Verifies user credentials, generates JWT if successful.
@@ -90,7 +90,7 @@ def login():
 
         return jsonify({
             "statusCode": "1",
-            "message": "Login successful",
+            "message": "pin code sent successfully",
             "token": token
         }), 200
 
@@ -102,6 +102,29 @@ def login():
 
 # Register the blueprint
 app.register_blueprint(auth_bp)
+
+
+@auth_bp.route('/validatePinCode', methods=['POST'])
+def login():
+    """
+    Login API - Verifies user credentials, generates JWT if successful.
+    """
+    try:
+        data = request.json
+        email = data.get("email", "").strip().lower()
+        pinCode = data.get("pinCode", "").strip()
+        return jsonify({
+            "statusCode": "1",
+            "message": "Login successful"
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            "statusCode": "0",
+            "message": f"Error: {str(e)}"
+        }), 500
+
+
 
 if __name__ == '__main__':
     app.run(debug=True, port=5001)
