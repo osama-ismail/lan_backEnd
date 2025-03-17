@@ -6,6 +6,7 @@ from flask_limiter.util import get_remote_address
 from werkzeug.utils import secure_filename
 from datetime import datetime
 from db import db
+from routes.auth_middleware import check_api_key, jwt_required
 
 UPLOAD_FOLDER = 'uploads'
 CACHE_FILE = "cached_users.json"
@@ -49,8 +50,12 @@ def save_cached_users(users):
 
 @answers_bp.route('/upload-video', methods=['POST'])
 @limiter.limit("5 per minute")
+@jwt_required 
 def upload_video():
     try:
+        api_check = check_api_key()
+        if api_check:  # If invalid, return error response
+            return api_check
         # Get file and form data
         file = request.files.get('file')
         user_id = request.form.get('user_id')

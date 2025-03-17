@@ -1,7 +1,8 @@
 from flask import Blueprint, request, jsonify
 import json
 import os
-from db import db  # Assuming these are helper functions for DB queries
+from db import db
+from routes.auth_middleware import check_api_key, jwt_required  # Assuming these are helper functions for DB queries
 
 questions_bp = Blueprint('questions', __name__)
 
@@ -18,11 +19,14 @@ def load_cached_users():
     except Exception as e:
         print(f"Error in load_cached_users: {e}")
         return []
-
+@jwt_required 
 @questions_bp.route('/next', methods=['POST'])
 def get_next_question():
     """Fetch the first unanswered question for the given user from the database."""
     try:
+        api_check = check_api_key()
+        if api_check:  # If invalid, return error response
+            return api_check
         data = request.json
         user_id = data.get("user_id")
 
@@ -53,11 +57,14 @@ def get_next_question():
     except Exception as e:
         print(f"Error in get_next_question: {e}")
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
-
+@jwt_required 
 @questions_bp.route('/count', methods=['POST'])
 def get_question_count():
     """Returns the total number of questions assigned to a user."""
     try:
+        api_check = check_api_key()
+        if api_check:  # If invalid, return error response
+            return api_check
         data = request.json
         user_id = data.get("user_id")
 

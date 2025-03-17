@@ -4,6 +4,8 @@ import cv2
 from db import db
 import numpy
 
+from routes.auth_middleware import check_api_key, jwt_required
+
 # Create a Blueprint for ID-related operations
 id_bp = Blueprint('id', __name__)
 
@@ -45,9 +47,13 @@ def compare(file_id, selfi_img):
         return 'Error in comparing faces'
 
 # Endpoint to compare faces and update interview status
+@jwt_required 
 @id_bp.route('/compare_faces', methods=['POST'])
 def compare_faces():
     try:
+        api_check = check_api_key()
+        if api_check:  # If invalid, return error response
+            return api_check
         # Get the uploaded images from the request
         file_id = request.files['id_image'].read()
         selfie_img = request.files['selfie_image'].read()

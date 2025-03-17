@@ -6,6 +6,13 @@ from functools import wraps
 # Secret key (must be same as the one used to generate JWT)
 JWT_SECRET_KEY = os.getenv("JWT_SECRET", "your_secret_key")
 
+API_KEY = "YOUR_SECRET_API_KEY"  # Replace with an environment variable in production
+
+def check_api_key():
+    """Middleware function to check API Key in request headers"""
+    api_key = request.headers.get('API-KEY')
+    if api_key != API_KEY:
+        return jsonify({"message": "Forbidden: Invalid API Key"}), 403  # Return 403 Forbidden
 def jwt_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):

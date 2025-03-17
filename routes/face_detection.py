@@ -1,16 +1,21 @@
 import cv2
 import face_recognition
 from flask import Blueprint, request, jsonify
-import numpy as np 
+import numpy as np
+
+from routes.auth_middleware import jwt_required 
 
 face_bp = Blueprint('face_detection', __name__)
-
+@jwt_required 
 @face_bp.route('', methods=['POST'])
 def detect_faces():
     """
     Face Detection API - Checks if a face is present in an image and counts the number of detected faces.
     """
     try:
+        api_check = check_api_key()
+        if api_check:  # If invalid, return error response
+            return api_check
         if 'image' not in request.files:
             return jsonify({"error": "Image file is required"}), 400
 

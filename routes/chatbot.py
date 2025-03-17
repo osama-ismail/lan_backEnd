@@ -12,6 +12,8 @@ import json
 from db import db
 from pydantic import BaseModel, Field
 
+from routes.auth_middleware import check_api_key, jwt_required
+
 chatbot_pb = Blueprint('chatbot', __name__)
 load_dotenv(dotenv_path='/home/Asem.Aydi/projects/APIs/interviews_APIs/.env')
 
@@ -142,10 +144,13 @@ def save_chat_history_to_db(user_id, chat_history, total_cost):
         print(f"Chat history saved for user_id: {user_id}")
     except Exception as e:
         print(f"Error in save_chat_history_to_db: {e}")
-
+@jwt_required 
 @chatbot_pb.route('/start-session', methods=['GET'])
 def start_session():
     try:
+        api_check = check_api_key()
+        if api_check:  # If invalid, return error response
+            return api_check
         session_id = str(uuid.uuid4())  # Generate a unique session ID
         sessions[session_id] = {
             "messages": [],
@@ -159,9 +164,13 @@ def start_session():
         return jsonify({"error": f"Failed to start session: {str(e)}"}), 500
 
 @chatbot_pb.route('/chat', methods=['POST'])
+@jwt_required 
 @limiter.limit("5 per minute")
 def chat():
     try:
+        api_check = check_api_key()
+        if api_check:  # If invalid, return error response
+            return api_check
         data = request.json
         session_id = data.get('session_id')
         user_input = data.get('user_input', '')
@@ -201,9 +210,14 @@ def chat():
         print(f"Error in chat: {e}")
         return jsonify({"error": f"An error occurred during the chat: {str(e)}"}), 500
 
+@jwt_required 
 @chatbot_pb.route('/end-session', methods=['POST'])
 def end_session():
     try:
+
+        api_check = check_api_key()
+        if api_check:  # If invalid, return error response
+            return api_check
         data = request.json
         session_id = data.get('session_id')
         user_id = data.get('user_id')

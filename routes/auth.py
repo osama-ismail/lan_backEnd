@@ -4,6 +4,8 @@ import jwt  # Import PyJWT
 from flask import Flask, Blueprint, request, jsonify
 from datetime import datetime, timedelta
 
+from routes.auth_middleware import check_api_key
+
 app = Flask(__name__)
 auth_bp = Blueprint('auth', __name__)
 
@@ -29,6 +31,9 @@ def login():
     Login API - Verifies user credentials, generates JWT if successful.
     """
     try:
+        api_check = check_api_key()
+        if api_check:  # If invalid, return error response
+            return api_check
         # Get request data
         data = request.json
         email = data.get("email", "").strip().lower()

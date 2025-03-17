@@ -13,6 +13,7 @@ from routes.face_detection import face_bp
 from routes.ID_detection import id_bp
 from routes.questions import questions_bp
 # from cache import update_cache, CACHE_FILE 
+from routes.auth_middleware import check_api_key
 
 import os
 
@@ -24,7 +25,11 @@ app.config['SESSION_TYPE'] = 'filesystem'
 app.config['SESSION_PERMANENT'] = False
 app.config['SESSION_USE_SIGNER'] = True
 app.secret_key = os.getenv("SECRET_KEY")
-
+@app.before_request
+def before_request():
+    api_check = check_api_key()
+    if api_check:  # If invalid, return error response
+        return api_check
 # Initialize Flask-Session
 Session(app)
 

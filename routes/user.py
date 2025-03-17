@@ -2,14 +2,19 @@ from flask import Blueprint, request, jsonify
 from db import db
 import json
 
-users_bp = Blueprint('users', __name__)
+from routes.auth_middleware import check_api_key, jwt_required
 
+users_bp = Blueprint('users', __name__)
+@jwt_required 
 @users_bp.route('/save-feedback', methods=['POST'])
 def save_feedback():
     """
     Save Feedback API - Stores user feedback as JSON and updates interview status to 4.
     """
     try:
+        api_check = check_api_key()
+        if api_check:  # If invalid, return error response
+            return api_check
         data = request.json
         user_id = data.get("user_id")
         rating = data.get("rating")
