@@ -1,23 +1,21 @@
 import json
 import os
+import random
 import jwt  # Import PyJWT
 from flask import Flask, Blueprint, request, jsonify
 from datetime import datetime, timedelta
+from db import db 
 
 from routes.auth_middleware import check_api_key
 
 app = Flask(__name__)
 auth_bp = Blueprint('auth', __name__)
 
-# Path to the JSON file (Ensure it's correct!)
-JSON_FILE_PATH = "cached_users.json"
-
-# Secret key for JWT (Store securely in an env variable)
-JWT_SECRET_KEY = os.getenv("JWT_SECRET", "your_secret_key")  # Change this in production
+JWT_SECRET_KEY = os.getenv("JWT_SECRET", "your_secret_key")
 
 def generate_jwt(email):
     """Generate a JWT token with expiration time."""
-    expiration = datetime.utcnow() + timedelta(hours=1)  # Token expires in 2 hours
+    expiration = datetime.utcnow() + timedelta(hours=1)  
     payload = {
         "email": email,
         "exp": expiration
@@ -28,13 +26,13 @@ def generate_jwt(email):
 @auth_bp.route('/auth', methods=['POST'])
 def login():
     """
-    Login API - Verifies user credentials, generates JWT if successful.
+    Login API - Verifies user credentials, checks login attempts, and generates PIN.
     """
     try:
         api_check = check_api_key()
-        if api_check:  # If invalid, return error response
+        if api_check:
             return api_check
-        # Get request data
+
         data = request.json
         email = data.get("email", "").strip().lower()
         password = data.get("password", "").strip()
@@ -42,89 +40,73 @@ def login():
         if not email or not password:
             return jsonify({"statusCode": "0", "message": "Both email and password are required"}), 400
 
-        # Check if JSON file exists
-        if not os.path.exists(JSON_FILE_PATH):
-            return jsonify({"statusCode": "0", "message": "Cached user file not found"}), 500
-
-        # Load users from JSON file
-        with open(JSON_FILE_PATH, "r", encoding="utf-8") as file:
-            users_data = json.load(file)
-
-        print(f"Users Data: {users_data}")  # Debugging
-        print(f"Looking for: {email}")  # Debugging
-
-        # Find user by email (Case insensitive)
-        user = next((user for user in users_data.get("users", []) if user.get("email", "").strip().lower() == email), None)
-
-        print(f"Found user: {user}")  # Debugging
+        query = """
+            SELECT PASSWORD, LOGIN_ATTEMPTS, IS_LOGGEDIN 
+            FROM AI_USERS WHERE LOWER(EMAIL) = :email
+        """
+        user = db.execute(query, {"email": email}).fetchone()
 
         if not user:
             return jsonify({"statusCode": "0", "message": "Failed - User not found"}), 404
 
-        # Check slot date
-        slot_date_str = user.get("slot_date", "")
-        if not slot_date_str:
-            return jsonify({"statusCode": "0", "message": "Invalid slot time"}), 400
+        db_password, login_attempts, is_loggedin = user
 
-        try:
-            slot_time = datetime.strptime(slot_date_str, "%Y-%m-%d")
-        except ValueError:
-            return jsonify({"statusCode": "0", "message": "Invalid slot time format"}), 400
-
-        now = datetime.utcnow()
+        if login_attempts >= 4:
+            return jsonify({"statusCode": "0", "message": "Too many failed login attempts. Try again later."}), 403
         
-        # Check if login is on the correct date
-        if slot_time.date() != now.date():
-            return jsonify({
-                "statusCode": "0",
-                "message": "Login is only allowed on your slot date"
-            }), 403
+        if is_loggedin:
+            return jsonify({"statusCode": "0", "message": "User is already logged in"}), 403
 
-        # Validate password
-        print(f"Stored Password: {user.get('password')} | Entered Password: {password}")  # Debugging
-        if user.get("password") != password:
+        if db_password != password:
             return jsonify({"statusCode": "0", "message": "Invalid password"}), 401
 
-        # Generate JWT token
-        token = generate_jwt(email)
+        new_pincode = str(random.randint(100000, 999999))
+        update_query = """
+            UPDATE AI_USERS 
+            SET PINCODE = :pincode, LOGIN_ATTEMPTS = LOGIN_ATTEMPTS + 1 
+            WHERE LOWER(EMAIL) = :email
+        """
+        db.execute(update_query, {"pincode": new_pincode, "email": email})
+
 
         return jsonify({
             "statusCode": "1",
-            "message": "pin code sent successfully",
-            "token": token
+            "message": "Pin code sent successfully",
         }), 200
 
     except Exception as e:
-        return jsonify({
-            "statusCode": "0",
-            "message": f"Error: {str(e)}"
-        }), 500
-
-# Register the blueprint
-app.register_blueprint(auth_bp)
-
+        return jsonify({"statusCode": "0", "message": f"Error: {str(e)}"}), 500
 
 @auth_bp.route('/validatePinCode', methods=['POST'])
-def login():
+def validate_pin_code():
     """
-    Login API - Verifies user credentials, generates JWT if successful.
+    Validate Pin Code API - Verifies the PIN for authentication.
     """
     try:
         data = request.json
         email = data.get("email", "").strip().lower()
         pinCode = data.get("pinCode", "").strip()
+
+        if not email or not pinCode:
+            return jsonify({"statusCode": "0", "message": "Email and PIN code are required"}), 400
+
+        query = "SELECT PINCODE FROM AI_USERS WHERE LOWER(EMAIL) = :email"
+        user = db.execute(query, {"email": email}).fetchone()
+
+        if not user:
+            return jsonify({"statusCode": "0", "message": "User not found"}), 404
+
+        stored_pincode = user[0]
+
+        if stored_pincode != pinCode:
+            return jsonify({"statusCode": "0", "message": "Invalid PIN code"}), 401
+        token = generate_jwt(email)
+
         return jsonify({
             "statusCode": "1",
-            "message": "Login successful"
+            "message": "Login successful",
+            "token":token
         }), 200
 
     except Exception as e:
-        return jsonify({
-            "statusCode": "0",
-            "message": f"Error: {str(e)}"
-        }), 500
-
-
-
-if __name__ == '__main__':
-    app.run(debug=True, port=5001)
+        return jsonify({"statusCode": "0", "message": f"Error: {str(e)}"}), 500
