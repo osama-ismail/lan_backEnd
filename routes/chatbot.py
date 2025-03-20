@@ -17,7 +17,6 @@ from routes.auth_middleware import check_api_key, jwt_required
 chatbot_pb = Blueprint('chatbot', __name__)
 load_dotenv(dotenv_path='/home/Asem.Aydi/projects/APIs/interviews_APIs/.env')
 
-
 # Initialize Flask App
 app = Flask(__name__)
 limiter = Limiter(app)
@@ -30,18 +29,6 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 
 # Store active sessions in-memory (use a database or a persistent store in production)
 sessions = {}
-
-qa_data = {
-    "متى سيتم الرجوع لي بنتيجة المقابلة؟": "خلال فترة أقصاها أسبوع سيتم التواصل معك بشأن نتيجة المقابلة.",
-    "ما هو برنامج جو بروفيشنال؟": "أضخم برنامج تدريبي في فلسطين، هدفه تأهيل المتدربين لسوق العمل. تكون مدة العقد 23 شهر، يحصل خلالها المتدرب على مكافآة شهرية وميزات مختلفة",
-    "ما هي مدة العقد؟": "23 شهر يتم التوقيع على عقدين",
-    "نوع العقد؟": "عقد جو بروفيشنال – عقد تدريبي",
-    "مكان العمل؟": "مقر الإدارة العامة – رام الله",
-    "هل السكن إجباري؟": "نعم في حال كان مكان السكن الحالي خارج رام الله في المحافظات الأخرى",
-    "هل يتم دفع بدل سكن؟": "متدربي جو بروفيشنال يحصلون على مبلغ رمزي بدل سكن 70 دينار بشكل شهري بشرط إحضار عقد الإيجار وصورة هوية المؤجر وتوقيع نموذج تعهد بدل سكن",
-    "هل أحصل على تأمين صحي؟": "تحصل على تأمين صحي شخصي بعد تثبيت فترة التجربة",
-    "كم سيكون مقدار المكافأة الشهرية او الراتب؟": "سيتم إبلاغك بالمكافأة الشهرية في حال اختيارك للانضمام للبرنامج التدريبي"
-}
 
 def is_prompt_injection(user_input):
     try:
@@ -71,7 +58,6 @@ def validate_response(response: str):
 class OutputSchema(BaseModel):
     response: str = Field(..., min_length=1, max_length=500)
 
-
 import tiktoken  # Ensure this library is installed for token calculations
 
 def calculate_token_cost(system_message, context, user_input, response, model="gpt-4"):
@@ -91,8 +77,27 @@ def calculate_token_cost(system_message, context, user_input, response, model="g
         print(f"Error in calculate_token_cost: {e}")
         return 0, 0
 
-def get_response_with_guid(user_input, qa_data):
+def get_qa_from_db():
     try:
+        
+        query = """
+            SELECT question, answer 
+            FROM osadm.interviews_chat_bot
+        """
+        result = db.execute(query)
+        qa_data = {row['question']: row['answer'] for row in result}
+        return qa_data
+    except Exception as e:
+        print(f"Error in get_qa_from_db: {e}")
+        return {}
+
+def get_response_with_guid(user_input):
+    try:
+       
+        qa_data = get_qa_from_db()
+        if not qa_data:
+            return "حدث خطأ في جلب البيانات من قاعدة البيانات."
+
         context = "\n".join([f"سؤال: {question}\nإجابة: {answer}" for question, answer in qa_data.items()])
         system_message = """
         أنت مساعد افتراضي يساعد المستخدم بالإجابة على الأسئلة بناءً على البيانات المتوفرة فقط.
@@ -144,6 +149,7 @@ def save_chat_history_to_db(user_id, chat_history, total_cost):
         print(f"Chat history saved for user_id: {user_id}")
     except Exception as e:
         print(f"Error in save_chat_history_to_db: {e}")
+
 @jwt_required 
 @chatbot_pb.route('/start-session', methods=['GET'])
 def start_session():
@@ -189,7 +195,7 @@ def chat():
             return jsonify({"response": "لقد وصلت إلى الحد الأقصى لعدد الأسئلة (5)."}), 400
 
         # Generate chatbot response
-        bot_response = get_response_with_guid(user_input, qa_data)
+        bot_response = get_response_with_guid(user_input)
 
         # Update session data
         session_data['messages'].append({"user": user_input, "bot": bot_response})
@@ -214,7 +220,6 @@ def chat():
 @chatbot_pb.route('/end-session', methods=['POST'])
 def end_session():
     try:
-
         api_check = check_api_key()
         if api_check:  # If invalid, return error response
             return api_check
@@ -234,3 +239,7 @@ def end_session():
     except Exception as e:
         print(f"Error in end_session: {e}")
         return jsonify({"error": f"An error occurred while ending the session: {str(e)}"}), 500
+    
+
+
+    

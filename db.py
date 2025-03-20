@@ -11,11 +11,11 @@ os.environ["NLS_LANG"] = ".AL32UTF8"
 class Database:
     def __init__(self):
         # Hardcode database credentials
-        self.username = os.getenv('DB_USERNAME')        
-        self.password = os.getenv('DB_PASSWORD')
-        self.dsn = os.getenv('DB_DSN')
+        self.username = "J9604677"
+        self.password = "kIcWDAh8bHE$Y"
+        self.dsn = "172.19.6.120:1532/APPSPDB1"  # Replace with your DSN
         self.connection = None
-
+        print("osama")
     def connect(self):
         try:
             # Close the existing connection if stale or invalid

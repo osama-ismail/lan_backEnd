@@ -32,39 +32,54 @@ def login():
         api_check = check_api_key()
         if api_check:
             return api_check
-
         data = request.json
         email = data.get("email", "").strip().lower()
         password = data.get("password", "").strip()
-
+        db.connect()
+        conn = db.connection
+            
+        
         if not email or not password:
             return jsonify({"statusCode": "0", "message": "Both email and password are required"}), 400
+        # query = """
+        #     SELECT PASSWORD, LOGIN_ATTEMPTS, IS_LOGGEDIN 
+        #     FROM osadm.interviews_users WHERE EMAIL = :email
+        # """
+        # user = db.execute(query, {"email": email}).fetchone()
+        print("email : ", email)
+        with conn.cursor() as cursor:
+            # Check if the answer already exists (fetch all matching records)
+            cursor.execute(
+                """
+               SELECT PASSWORD, LOGIN_ATTEMPTS, IS_LOGGEDIN 
+            FROM osadm.interviews_users WHERE EMAIL = :email
+                """,
+                {"email": email}
+            )
+            user = cursor.fetchone()
 
-        query = """
-            SELECT PASSWORD, LOGIN_ATTEMPTS, IS_LOGGEDIN 
-            FROM AI_USERS WHERE LOWER(EMAIL) = :email
-        """
-        user = db.execute(query, {"email": email}).fetchone()
-
+        conn.commit()
+        print(user)
         if not user:
             return jsonify({"statusCode": "0", "message": "Failed - User not found"}), 404
 
         db_password, login_attempts, is_loggedin = user
-
+        if login_attempts is None:  
+            login_attempts = 0
         if login_attempts >= 4:
             return jsonify({"statusCode": "0", "message": "Too many failed login attempts. Try again later."}), 403
         
-        if is_loggedin:
-            return jsonify({"statusCode": "0", "message": "User is already logged in"}), 403
-
+        # if is_loggedin:
+        #     return jsonify({"statusCode": "0", "message": "User is already logged in"}), 403
+        print(db_password)
         if db_password != password:
             return jsonify({"statusCode": "0", "message": "Invalid password"}), 401
 
         new_pincode = str(random.randint(100000, 999999))
         update_query = """
-            UPDATE AI_USERS 
+            UPDATE osadm.interviews_users 
             SET PINCODE = :pincode, LOGIN_ATTEMPTS = LOGIN_ATTEMPTS + 1 
-            WHERE LOWER(EMAIL) = :email
+            WHERE EMAIL = :email
         """
         db.execute(update_query, {"pincode": new_pincode, "email": email})
 
@@ -75,6 +90,7 @@ def login():
         }), 200
 
     except Exception as e:
+        print(e)
         return jsonify({"statusCode": "0", "message": f"Error: {str(e)}"}), 500
 
 @auth_bp.route('/validatePinCode', methods=['POST'])
@@ -86,13 +102,24 @@ def validate_pin_code():
         data = request.json
         email = data.get("email", "").strip().lower()
         pinCode = data.get("pinCode", "").strip()
-
+        db.connect()
+        conn = db.connection
         if not email or not pinCode:
             return jsonify({"statusCode": "0", "message": "Email and PIN code are required"}), 400
+        with conn.cursor() as cursor:
+            # Check if the answer already exists (fetch all matching records)
+            cursor.execute(
+                """
+               SELECT PINCODE FROM osadm.interviews_users WHERE EMAIL = :email
+                """,
+                {"email": email}
+            )
+            user = cursor.fetchone()
 
-        query = "SELECT PINCODE FROM AI_USERS WHERE LOWER(EMAIL) = :email"
-        user = db.execute(query, {"email": email}).fetchone()
-
+        conn.commit()
+        # query = "SELECT PINCODE FROM AI_USERS WHERE LOWER(EMAIL) = :email"
+        # user = db.execute(query, {"email": email}).fetchone()
+        print(user)
         if not user:
             return jsonify({"statusCode": "0", "message": "User not found"}), 404
 
