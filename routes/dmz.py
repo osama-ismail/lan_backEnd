@@ -2,18 +2,26 @@ from flask import Flask, request, jsonify
 import requests
 import os
 from dotenv import load_dotenv
+from flask_cors import CORS
 
-load_dotenv()
 
-API_SERVER_URL = os.getenv("API_SERVER_URL")
-API_KEY = "YOUR_SECRET_API_KEY"
+load_dotenv(dotenv_path='/home/asem/projects/hr-interview-analyzer-main/backend/.env')
+
+API_SERVER_URL = os.getenv("MIDDLEWARE_SERVER_URL")
+API_KEY = os.getenv("MIDDLEWARE_API_KEY")
+
+
 
 app = Flask(__name__)
-@app.route('/auth', methods=['POST'])
+CORS(app, resources={r"/*": {"origins": ["http://10.64.5.117", "http://10.64.6.117"]}}, supports_credentials=True)
+
+
+
+@app.route('/auth/auth', methods=['POST'])
 def auth():
     data = request.json
-    email = data.get(email)
-    password = data.get(password)
+    email = data.get("email")
+    password = data.get("password")
     auth_token = request.headers.get("Authorization")
     
     headers = {
@@ -29,11 +37,11 @@ def auth():
     else:
         return jsonify({"error": response.json()}), 500
 
-@app.route('/validatePinCode', methods=['POST'])
+@app.route('/auth/validatePinCode', methods=['POST'])
 def validatePinCode():
     data = request.json
-    email = data.get(email)
-    pinCode = data.get(pinCode)
+    email = data.get("email")
+    pinCode = data.get("pinCode")
     auth_token = request.headers.get("Authorization")
     
     headers = {
@@ -48,6 +56,10 @@ def validatePinCode():
         return jsonify(response.json()), 200
     else:
         return jsonify({"error": response.json()}), 500
+
+
+
+
 
 # API to save feedback
 @app.route('/save-feedback', methods=['POST'])
@@ -65,6 +77,24 @@ def save_feedback():
     }
     url = f"{API_SERVER_URL}/users/save-feedback"
     response = requests.post(url, json={"user_id": user_id, "rating": rating, "notes": notes},headers=headers)
+
+    if response.status_code == 200:
+        return jsonify(response.json()), 200
+    else:
+        return jsonify({"error": response.json()}), 500
+@app.route('/face_detection', methods=['POST'])
+def face_detection():
+    image_file = request.files['image']
+
+    auth_token = request.headers.get("Authorization")
+    
+    headers = {
+        "API-KEY": API_KEY,
+        "Content-Type": "application/json",
+        "Authorization":auth_token
+    }
+    url = f"{API_SERVER_URL}/face/face_detection"
+    response = requests.post(url, json={"image_file": image_file},headers=headers)
 
     if response.status_code == 200:
         return jsonify(response.json()), 200
@@ -196,4 +226,4 @@ def upload_video():
 
 
 if __name__ == '__main__':
-    app.run(debug=True, host="0.0.0.0", port=5001) #dmz host and port
+    app.run(debug=False, host="10.64.5.117", port=5002) #dmz host and port

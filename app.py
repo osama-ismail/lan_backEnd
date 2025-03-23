@@ -9,8 +9,8 @@ from routes.user import users_bp
 from routes.answers import answers_bp
 from routes.auth import auth_bp
 from routes.chatbot import chatbot_pb
-# from routes.face_detection import face_bp
-# from routes.ID_detection import id_bp
+from routes.face_detection import face_bp
+from routes.ID_detection import id_bp
 from routes.questions import questions_bp
 # from cache import update_cache, CACHE_FILE 
 from routes.auth_middleware import check_api_key
@@ -47,6 +47,8 @@ app.register_blueprint(users_bp, url_prefix='/users')
 app.register_blueprint(answers_bp, url_prefix='/answers')
 app.register_blueprint(chatbot_pb, url_prefix='/chatbot')
 app.register_blueprint(auth_bp, url_prefix='/auth')
+app.register_blueprint(face_bp, url_prefix='/face')
+app.register_blueprint(id_bp, url_prefix='/id')
 
 
 
@@ -58,5 +60,7 @@ app.register_blueprint(auth_bp, url_prefix='/auth')
 # @app('/test1233', methods=['GET'])
 # def upload_video():
 #     return 'hi'
-if __name__ == '__main__':
-    app.run(host='127.0.0.1', port=5001)  # Change port
+
+
+if __name__ == "__main__":
+    app.run(host="127.0.0.0", port=5011, debug= False )  
